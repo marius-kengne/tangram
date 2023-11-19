@@ -1,0 +1,275 @@
+<!doctype html>
+<html>
+<head>
+	<title>Tangram</title>
+   <style>
+      * { font-family: Arial, Helvetica, sans-serif; }
+      #map { border: 1px solid #888; }
+      #dump { width:1024px;height:232px }
+   </style>
+</head>
+<body onload='init()'>
+	<p>
+      <input type='text' id='name' placeholder='???'>
+      <button onclick='save()'>&gt;&gt;</button>
+      <select id='list' onchange='load()'>
+         <option>---</option>
+      </select>
+   </p>
+   <canvas id='map' width='1024px' height='768px'></canvas>
+   <textarea id='dump'></textarea>
+</body>
+   <script type="text/javascript" src="Box2dWeb-2.1.a.3.js"></script>
+   <script src="list.js"></script>
+   <script type="text/javascript">
+      var world = new Box2D.Dynamics.b2World(new Box2D.Common.Math.b2Vec2(0, 0), true);
+      var bodies = [];
+      var $name = document.getElementById('name');
+      var $list = document.getElementById('list');   
+      var $dump = document.getElementById('dump');
+
+      function save() {
+         let name = $name.value
+         let states = []
+
+         for(body of bodies) {
+            let pos = body.GetPosition()
+            states.push({ "pos": new Box2D.Common.Math.b2Vec2(pos.x, pos.y), "a": body.GetAngle() })
+         }
+         $list.innerHTML += `<option value='${ list.length }'>${ name }</option>`
+         list.push({ "name": name, "states": states })
+         $dump.innerText=JSON.stringify(list)
+      }
+
+      function load() {
+         try {
+            let id = parseInt($list.value)
+            let states = list[id].states
+            let len = Math.min(bodies.length, states.length)
+
+            world.ClearForces()
+            for(let i = 0; i<len; i++) {
+               bodies[i].SetPositionAndAngle(states[i].pos, states[i].a)               
+            }
+         }
+         catch { }
+      }
+
+      //http://js-tut.aardon.de/js-tut/tutorial/position.html
+      function getElementPosition(element) {
+         var elem=element, tagname="", x=0, y=0;
+        
+         while((typeof(elem) == "object") && (typeof(elem.tagName) != "undefined")) {
+            y += elem.offsetTop;
+            x += elem.offsetLeft;
+            tagname = elem.tagName.toUpperCase();
+
+            if(tagname == "BODY")
+               elem=0;
+
+            if(typeof(elem) == "object" && typeof(elem.offsetParent) == "object")
+               elem = elem.offsetParent;
+         }
+         return {x: x, y: y};
+      }
+      function init(){
+         var   b2Vec2 = Box2D.Common.Math.b2Vec2
+            ,  b2AABB = Box2D.Collision.b2AABB
+         	,	b2BodyDef = Box2D.Dynamics.b2BodyDef
+         	,	b2Body = Box2D.Dynamics.b2Body
+         	,	b2FixtureDef = Box2D.Dynamics.b2FixtureDef
+         	,	b2Fixture = Box2D.Dynamics.b2Fixture
+         	,	b2World = Box2D.Dynamics.b2World
+         	,	b2MassData = Box2D.Collision.Shapes.b2MassData
+            ,  b2Color = Box2D.Common.b2Color
+         	,	b2FrictionJointDef = Box2D.Dynamics.Joints.b2FrictionJointDef
+            ,  b2PolygonShape = Box2D.Collision.Shapes.b2PolygonShape
+         	,	b2CircleShape = Box2D.Collision.Shapes.b2CircleShape
+         	,	b2DebugDraw = Box2D.Dynamics.b2DebugDraw
+            ,  b2MouseJointDef =  Box2D.Dynamics.Joints.b2MouseJointDef
+            ;
+
+      var map=document.getElementById("map");
+      var moving=[];
+      var scale = 30.0, 
+          width =map.width /scale, 
+          height=map.height/scale,
+          moveForce   = 8000.0,
+          dampingSleep=10000.0,
+          densitySleep=   30.0,
+          dampingAwake=    4.0,
+          densityAwake=    1.0;
+
+      Box2D.Common.b2Settings.b2_timeToSleep = 0.01;
+
+      // Frame
+      var fixFrame = new b2FixtureDef;
+      var bodyFrameDef = new b2BodyDef;
+
+		fixFrame.density     = 1.0;
+		fixFrame.friction    = 1.0;
+		fixFrame.restitution = 0;
+
+		bodyFrameDef.type = b2Body.b2_staticBody;
+		fixFrame.shape = new b2PolygonShape;
+		fixFrame.shape.SetAsBox(width/2, 2); 
+		bodyFrameDef.position.Set(width/2, height+2);
+		world.CreateBody(bodyFrameDef).CreateFixture(fixFrame);
+		bodyFrameDef.position.Set(width/2, -2);
+		world.CreateBody(bodyFrameDef).CreateFixture(fixFrame);
+		fixFrame.shape.SetAsBox(2, height/2);
+		bodyFrameDef.position.Set(-2, height/2); 
+		world.CreateBody(bodyFrameDef).CreateFixture(fixFrame);
+		bodyFrameDef.position.Set(width+2, height/2);
+		var bodyFrame=world.CreateBody(bodyFrameDef);
+      bodyFrame.CreateFixture(fixFrame);
+
+      // Tangram
+		var unit=99/scale, unit_sqrt2=140/scale, unit_div_sqrt2=70/scale;
+		var offset=unit_sqrt2/2.784;
+		var vtx=[
+			new b2Vec2(0, 0),
+			new b2Vec2(unit_sqrt2, 0),
+			new b2Vec2(2*unit_sqrt2, 0),
+			new b2Vec2(unit_sqrt2-unit_div_sqrt2, unit_div_sqrt2),
+			new b2Vec2(2*unit_sqrt2-unit_div_sqrt2, unit_div_sqrt2),
+			new b2Vec2(0, unit_sqrt2),
+			new b2Vec2(unit_sqrt2, unit_sqrt2),
+			new b2Vec2(unit_sqrt2-unit_div_sqrt2,unit_sqrt2*2-unit_div_sqrt2),
+			new b2Vec2(0,2*unit_sqrt2),
+			new b2Vec2(2*unit_sqrt2, 2*unit_sqrt2)
+		];
+		var data=[
+			{ coords:[vtx[5], vtx[7], vtx[8]]			, color:[0x63/0xFF, 0x22/0xFF, 0x66/0xFF] },
+			{ coords:[vtx[0], vtx[1], vtx[5]]			, color:[0xDF/0xFF, 0x02/0xFF, 0x36/0xFF] },
+			{ coords:[vtx[1], vtx[2], vtx[4], vtx[3]]	, color:[0xFF/0xFF, 0xE5/0xFF, 0x00/0xFF] },
+			{ coords:[vtx[2], vtx[9], vtx[6]]			, color:[0x53/0xFF, 0xAF/0xFF, 0x31/0xFF] },
+			{ coords:[vtx[3], vtx[4], vtx[6]]			, color:[0xF0/0xFF, 0x80/0xFF, 0x0E/0xFF] },
+			{ coords:[vtx[3], vtx[6], vtx[7], vtx[5]]	, color:[0x9E/0xFF, 0x34/0xFF, 0x8B/0xFF] },
+			{ coords:[vtx[8], vtx[6], vtx[9]]			, color:[0x00/0xFF, 0xA5/0xFF, 0xCD/0xFF] }
+		];
+      var fixDef = new b2FixtureDef;
+      var bodyDef = new b2BodyDef;
+
+      fixDef.density = densitySleep;
+      fixDef.friction = 0;
+      fixDef.restitution = 0;
+
+		bodyDef.type = b2Body.b2_dynamicBody;
+		for(var i in data) {
+		   fixDef.shape = new b2PolygonShape;
+         fixDef.shape.color=data[i].color;
+         fixDef.shape.SetAsArray(data[i].coords, data[i].coords.length);
+         bodyDef.position.x = data[i].coords[0].x*.001;
+         bodyDef.position.y = data[i].coords[0].y*.001;
+         bodyDef.linearDamping =dampingSleep;
+         bodyDef.angularDamping=dampingSleep;
+         var body=world.CreateBody(bodyDef);
+         body.customColor=data[i].color;
+         body.CreateFixture(fixDef);
+         bodies.push(body);
+      }
+		var debugDraw = new b2DebugDraw();
+		
+   	debugDraw.SetSprite(map.getContext("2d"));
+		debugDraw.SetDrawScale(scale);
+		debugDraw.SetFillAlpha(1);
+		debugDraw.SetLineThickness(1.0);
+		debugDraw.SetFlags(b2DebugDraw.e_shapeBit );
+		world.SetDebugDraw(debugDraw);
+      
+      for(i in list) {
+         $list.innerHTML+=`<option value='${i}'>${list[i].name}</option>`
+      }
+
+      window.setInterval(update, 1000 / 25);
+      
+      var mouseX, mouseY, mousePVec, isMouseDown, selectedBody, mouseJoint;
+      var canvasPosition = getElementPosition(map);
+      
+      document.addEventListener("mousedown", function(e) {
+         isMouseDown = true;
+         handleMouseMove(e);
+         document.addEventListener("mousemove", handleMouseMove, true);
+      }, true);
+      
+      document.addEventListener("mouseup", function() {
+         document.removeEventListener("mousemove", handleMouseMove, true);
+         isMouseDown = false;
+         mouseX = mouseY = undefined;
+      }, true);
+
+      function handleMouseMove(e) {
+         mouseX = (e.clientX - canvasPosition.x + window.scrollX) / scale;
+         mouseY = (e.clientY - canvasPosition.y + window.scrollY) / scale;
+      };
+      
+      function getBodyAtMouse() {
+         var aabb = new b2AABB();
+         
+         mousePVec = new b2Vec2(mouseX, mouseY);
+         aabb.lowerBound.Set(mouseX - 0.001, mouseY - 0.001);
+         aabb.upperBound.Set(mouseX + 0.001, mouseY + 0.001);
+         selectedBody = null;
+         world.QueryAABB(getBodyCB, aabb);
+         return selectedBody;
+      }
+
+      function getBodyCB(fixture) {
+         if(fixture.GetShape().TestPoint(fixture.GetBody().GetTransform(), mousePVec)) {
+            selectedBody = fixture.GetBody();
+            return false;
+         }
+         else
+            return true;
+      }
+      
+      function update() {
+      
+         if(isMouseDown && (!mouseJoint)) {
+            var body = getBodyAtMouse();
+            if(body) {
+               var md = new b2MouseJointDef();
+      
+               md.bodyA = world.GetGroundBody();
+               md.bodyB = body;
+               md.target.Set(mouseX, mouseY);
+               md.collideConnected = true;
+               md.maxForce = moveForce * body.GetMass();
+               mouseJoint = world.CreateJoint(md);
+               body.SetLinearDamping (dampingAwake);
+               body.SetAngularDamping(dampingAwake);
+               body.GetFixtureList().SetDensity(densityAwake);
+               body.ResetMassData();
+               body.SetAwake(true);
+            }
+         }
+         
+         if(mouseJoint) {
+            if(isMouseDown) {
+               mouseJoint.SetTarget(new b2Vec2(mouseX, mouseY));
+            } else {
+               var body=mouseJoint.GetBodyB();
+         
+               moving.push(body);
+               body.GetFixtureList().SetDensity(densitySleep);
+               body.ResetMassData();
+               world.DestroyJoint(mouseJoint);
+               mouseJoint = null;   
+            }
+         }
+         
+         for(var i=moving.length; i--; )
+            if(!moving[i].IsAwake()) {
+               moving[i].SetLinearDamping(dampingSleep);
+               moving[i].SetAngularDamping(dampingSleep);
+               moving.splice(i, 1);
+            }
+      
+         world.Step(1 / 60, 10, 10);
+         world.DrawDebugData();
+         world.ClearForces();
+      }
+   };
+	</script>
+</html>
