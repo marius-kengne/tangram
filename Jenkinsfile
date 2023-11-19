@@ -6,6 +6,11 @@ pipeline {
         }
     }
     stages{
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/preprod']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/marius-kengne/tangram.git']]])
+            }
+        }
         stage('build') {
             steps {
                 sh 'sh ./scripts/build.sh'
