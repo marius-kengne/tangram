@@ -6,9 +6,29 @@ pipeline {
         }
     }
     stages{
-        stage('Checkout') {
+        stage('Checkout dev') {
+            when(
+                branch 'dev'
+            )
             steps {
                 checkout([$class: 'GitSCM', branches: [[name: '*/dev']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/marius-kengne/tangram.git']]])
+            }
+        }
+        stage('Checkout main') {
+            when(
+                branch 'main'
+            )
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/marius-kengne/tangram.git']]])
+            }
+        }
+
+        stage('Checkout preprod') {
+            when(
+                branch 'preprod'
+            )
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/preprod']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[url: 'https://github.com/marius-kengne/tangram.git']]])
             }
         }
         stage('build') {
