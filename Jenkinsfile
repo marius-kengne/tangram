@@ -21,17 +21,32 @@ pipeline {
                 sh 'sh ./scripts/test.sh'
             }
         }
+           
         stage('validate') {
+            when(
+                branch 'preprod'
+            )
             steps {
                 input message:'Validation manuelle (voir tâche suivante)', ok:'Allons-y'
                 sh 'sh ./scripts/validate.sh 8000'
             }
         }
         stage('deploy') {
+            when(
+                branch 'main'
+            )
             steps {
                 archiveArtifacts artifacts: 'out/*', fingerprint: true
                 sh 'sh ./scripts/deploy.sh'
             }
         }     
+        stage('deploy dev') {
+            when(
+                branch 'dev'
+            )
+            steps {
+                archiveArtifacts artifacts: 'out/*', fingerprint: true
+            }
+        } 
     }
 }
